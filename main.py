@@ -141,3 +141,47 @@ class StickyNotesApp(ctk.CTk):
             font=ctk.CTkFont(size=12)
         )
         self.tray_status.pack(side='right')
+
+    def create_tray_icon(self):
+        """Создает иконку в системном трее"""
+        try:
+            import pystray
+            from pystray import MenuItem as item
+
+            def create_image():
+                width = 64
+                height = 64
+                image = Image.new('RGB', (width, height), '#1a1a1a')
+                dc = ImageDraw.Draw(image)
+                dc.rectangle([10, 10, width-10, height-10], fill='#f1c40f', outline='#f39c12', width=2)
+
+                for i in range(15, height-15, 8):
+                    dc.line([15, i, width-15, i], fill='#d35400', width=1)
+                
+                return image
+            
+            menu = pystray.Menu(
+                item('Открыть планировщик', self.show_from_tray),
+                item('Веход', self.quit_app)
+            )
+
+            self.tray_icon =  pystray.Icon(
+                'sticky_notes_planner',
+                create_image(),
+                'Мой стикер-планировщик',
+                menu
+            )
+
+            import threading
+            def run_tray_icon():
+                self.tray_icon_running = True
+                self.tray_icon.run()
+
+            thread = threading.Thread(target=run_tray_icon, daemon=True)
+            thread.start()
+
+        except ImportError as e:
+            print(f'Библиотека pystray не установлена: {e}')
+            self.show_pystray_error()
+        except Exception as e:
+            print(f'Ошибка создания иконки трея: {e}')

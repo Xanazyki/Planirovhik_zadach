@@ -185,3 +185,13 @@ class StickyNotesApp(ctk.CTk):
             self.show_pystray_error()
         except Exception as e:
             print(f'Ошибка создания иконки трея: {e}')
+
+    def show_pystray_error(self):
+        """Сообщение об ошибке"""
+        error_label = ctk.CTkLabel(
+            self,
+            text='Для работы работы с треем установите: pip install pystray',
+            text_color="#e74c3c",
+            font=ctk.CTkFont(size=12)
+        )
+        error_label.grid(row=2, column=0, pady=10)

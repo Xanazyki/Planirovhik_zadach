@@ -195,3 +195,8 @@ class StickyNotesApp(ctk.CTk):
             font=ctk.CTkFont(size=12)
         )
         error_label.grid(row=2, column=0, pady=10)
+
+    def hide_to_tray(self):
+        "Скрывает окно в трее"
+        self.withdraw()
+        self.update_tray_status('Свернуто в трей')

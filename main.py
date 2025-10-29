@@ -200,3 +200,11 @@ class StickyNotesApp(ctk.CTk):
         "Скрывает окно в трее"
         self.withdraw()
         self.update_tray_status('Свернуто в трей')
+
+    def show_from_tray(self, icon=None, item=None):
+        """Показывает окно из трея"""
+        self.deiconify()
+        self.lift()
+        self.focus_force()
+        self.state('normal')
+        self.update_tray_status('Окно открыто')

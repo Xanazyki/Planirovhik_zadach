@@ -78,3 +78,37 @@ class StickyNotesApp(ctk.CTk):
             '• Приоритеты в цветах и дедлайны\n\n'
             'Сейчас приложение работает в трее - проверьте иконку рядом с часами!'
         )
+
+        instruction_label = ctk.CTkLabel(
+            content_frame,
+            text=instruction_text,
+            font=ctk.CTkFont(size=14),
+            text_color='#bdc3c7',
+            justify='left'
+        )
+        instruction_label.grid(row=0, column=0, padx=20, pady=20)
+
+    def setup_trash_tab(self):
+        'Настройка корзины'
+        content_frame = ctk.CTkFrame(self.trash_tab, fg_color='transparent')
+        content_frame.grid(row=0, column=0, sticky='nsew')
+        content_frame.grid_rowconfigure(0, weight=1)
+        content_frame.grid_columnconfigure(0, weight=1)
+
+        trash_text = (
+            '🗑️ Корзина\n\n'
+            'Здесь будут появляться выполненные задачи\n'
+            'Вы сможете:\n'
+            '• Восстанавливать задачи\n'
+            '• Очищать корзину полностью\n'
+            '• Видеть историю авполненных задач'
+        )
+
+        trash_label = ctk.CTkLabel(
+            content_frame,
+            text=trash_text,
+            font=ctk.CTkFont(size=14),
+            text_color='#7f8c8d',
+            justify='center'
+        )
+        trash_label.grid(row=0, column=0, padx=20, pady=20)

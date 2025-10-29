@@ -112,3 +112,32 @@ class StickyNotesApp(ctk.CTk):
             justify='center'
         )
         trash_label.grid(row=0, column=0, padx=20, pady=20)
+
+    def setup_control_panel(self, parent):
+        """Панель управления внизу окна"""
+        control_frame = ctk.CTkFrame(parent)
+        control_frame.grid(row=1, column=0, padx=0, pady=(10, 0), sticky='ew')
+
+        left_frame = ctk.CTkFrame(control_frame, fg_color='transparent')
+        left_frame.pack(side='left', padx=10, pady=10)
+
+        self.tray_btn = ctk.CTkButton(
+            left_frame,
+            text='📌 Свернуть в трей',
+            command=self.hide_to_tray,
+            width=120,
+            fg_color='#2c3e50',
+            hover='#34495e'
+        )
+        self.tray_btn.pack(side='left', padx=(0, 10))
+
+        right_frame = ctk.CTkFrame(control_frame, fg_color='transparent')
+        right_frame.pack(side='right', padx=10, pady=10)
+
+        self.tray_status = ctk.CTkLabel(
+            right_frame,
+            text='Приложение работает в трее',
+            text_color='#27ae60',
+            font=ctk.CTkFont(size=12)
+        )
+        self.tray_status.pack(side='right')

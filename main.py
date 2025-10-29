@@ -61,3 +61,20 @@ class StickyNotesApp(ctk.CTk):
         self.setup_main_tab()
         self.setup_trash_tab()
         self.setup_control_panel(main_frame)
+
+    def setup_main_tab(self):
+        """Настраиваем вклудку с задачами"""
+        content_frame = ctk.CTkFrame(self.main_tab, fg_color='transparent')
+        content_frame.grid(row=0, column=0, sticky='nsew')
+        content_frame.grid_rowconfigure(0, weight=1)
+        content_frame.grid_columnconfigure(0, weight=1)
+
+        instruction_text = (
+            'Добро пожаловать в ваш стикер-пранировщик! \n\n'
+            'На следующих этапах здесь появятся:\n'
+            '• Создание стикеров-задач\n'
+            '• Перемещение стикеров\n'
+            '• Вкладки с разными тематиками\n'
+            '• Приоритеты в цветах и дедлайны\n\n'
+            'Сейчас приложение работает в трее - проверьте иконку рядом с часами!'
+        )

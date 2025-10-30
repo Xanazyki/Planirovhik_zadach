@@ -4,6 +4,7 @@ from PIL import Image, ImageDraw
 import sys
 import os
 import json
+import winreg as reg
 
 
 ctk.set_appearance_mode('Dark')
@@ -15,27 +16,17 @@ class StickyNotesApp(ctk.CTk):
         super().__init__()
 
         self.title('Планировщик задач')
-        self.geometry('900x700')
-        self.minsize(700, 500)
+        self.geometry('1000x800')
+        self.minsize(800, 600)
 
         self.tray_icon = None
         self.tray_icon_running = False
 
+        self.create_ui()
+
         self.create_tray_icon()
 
         self.protocol('WM_DELETE_WINDOW', self.hide_to_tray)
-        self.bind('<Unmap>', self.check_minimize)
-
-        self.create_ui()
-
-        self.deiconify()
-        self.lift()
-        self.focus_force()
-
-    def check_minimize(self, event):
-        """Проверка, когда окно минимизируется"""
-        if self.state() == 'iconic':
-            self.hide_to_tray()
 
     def create_ui(self):
         """Создает базовый интерфейс приложения"""
@@ -47,100 +38,86 @@ class StickyNotesApp(ctk.CTk):
         main_frame.grid_rowconfigure(0, weight=1)
         main_frame.grid_columnconfigure(0, weight=1)
 
-        self.tabview = ctk.CTkTabview(main_frame)
+        self.tabview = ctk.CTkTabview(main_frame, segmented_button_font=ctk.CTkFont(size=16, weight='bold'))
         self.tabview.grid(row=0, column=0, sticky='nsew')
 
         self.main_tab = self.tabview.add('Мои задачи')
-        self.trash_tab = self.tabview.add('Корзина')
 
-        for tab_name in ['Мои задачи', 'Корзина']:
-            tab = self.tabview.tab(tab_name)
-            tab.grid_rowconfigure(0, weight=1)
-            tab.grid_columnconfigure(0, weight=1)
+        self.main_tab.grid_rowconfigure(0, weight=1)
+        self.main_tab.grid_columnconfigure(0, weight=1)
 
-        self.setup_main_tab()
-        self.setup_trash_tab()
+        self.setup_canvas()
         self.setup_control_panel(main_frame)
 
-    def setup_main_tab(self):
-        """Настраиваем вклудку с задачами"""
-        content_frame = ctk.CTkFrame(self.main_tab, fg_color='transparent')
-        content_frame.grid(row=0, column=0, sticky='nsew')
-        content_frame.grid_rowconfigure(0, weight=1)
-        content_frame.grid_columnconfigure(0, weight=1)
-
-        instruction_text = (
-            'Добро пожаловать в ваш стикер-пранировщик! \n\n'
-            'На следующих этапах здесь появятся:\n'
-            '• Создание стикеров-задач\n'
-            '• Перемещение стикеров\n'
-            '• Вкладки с разными тематиками\n'
-            '• Приоритеты в цветах и дедлайны\n\n'
-            'Сейчас приложение работает в трее - проверьте иконку рядом с часами!'
+    def setup_trash_icon(self):
+        'Иконка корзины'
+        self.trash_icon = ctk.CTkButton(
+            self.main_tab,
+            text='🗑️'
+            width=60,
+            height=60,
+            font=ctk.CTkFont(size=24),
+            fg_color='#e74c3c',
+            hover_color='#c0392b',
+            corner_radius=30,
+            state='disabled',
+            command=self.open_trash
         )
 
-        instruction_label = ctk.CTkLabel(
-            content_frame,
-            text=instruction_text,
-            font=ctk.CTkFont(size=14),
-            text_color='#bdc3c7',
-            justify='left'
-        )
-        instruction_label.grid(row=0, column=0, padx=20, pady=20)
+        self.trash_icon.place(relx=1.0, rely=1.0, x=-20, y=-20, anchor='se')
 
-    def setup_trash_tab(self):
-        'Настройка корзины'
-        content_frame = ctk.CTkFrame(self.trash_tab, fg_color='transparent')
-        content_frame.grid(row=0, column=0, sticky='nsew')
-        content_frame.grid_rowconfigure(0, weight=1)
-        content_frame.grid_columnconfigure(0, weight=1)
-
-        trash_text = (
-            '🗑️ Корзина\n\n'
-            'Здесь будут появляться выполненные задачи\n'
-            'Вы сможете:\n'
-            '• Восстанавливать задачи\n'
-            '• Очищать корзину полностью\n'
-            '• Видеть историю авполненных задач'
+    def setup_canvas(self):
+        "Свободное размещение задач"
+        self.canvas = tk.Canvas(
+            self.main_tab,
+            bg='#2b2b2b',
+            highlightthickness=0
         )
 
-        trash_label = ctk.CTkLabel(
-            content_frame,
-            text=trash_text,
-            font=ctk.CTkFont(size=14),
-            text_color='#7f8c8d',
-            justify='center'
+        self.canvas.grid(row=0, column=0, sticky='nsew')
+
+        self.canvas.bind('<Button-1>', self.on_canvas_click)
+        self.canvas.bind('<B1-Motion>', self.on_canvas_drag)
+        self.canvas.bind('<ButtonRelease-1>', self.on_canvas_release)
+
+    def create_temp_sticker(self, text, x, y):
+        sticker_width = 250
+        sticker_height = 180
+
+        sticker_bg = self.canvas.create_rectangle(
+            x, y, x + sticker_width, y + sticker_height,
+            fill="#ca9911",
+            outline='#f39c12'
+            width=2,
+            tags='temp_sticker'
         )
-        trash_label.grid(row=0, column=0, padx=20, pady=20)
 
-    def setup_control_panel(self, parent):
-        """Панель управления внизу окна"""
-        control_frame = ctk.CTkFrame(parent)
-        control_frame.grid(row=1, column=0, padx=0, pady=(10, 0), sticky='ew')
-
-        left_frame = ctk.CTkFrame(control_frame, fg_color='transparent')
-        left_frame.pack(side='left', padx=10, pady=10)
-
-        self.tray_btn = ctk.CTkButton(
-            left_frame,
-            text='📌 Свернуть в трей',
-            command=self.hide_to_tray,
-            width=120,
-            fg_color='#2c3e50',
-            hover='#34495e'
+        sticker_text = self.canvas.create_text(
+            x + sticker_width // 2, y + sticker_height // 2,
+            text=text,
+            width=sticker_width - 20,
+            font=('Arial', 11),
+            fill='#2c3e50'
+            justify='center',
+            tags='temp_sticker'
         )
-        self.tray_btn.pack(side='left', padx=(0, 10))
 
-        right_frame = ctk.CTkFrame(control_frame, fg_color='transparent')
-        right_frame.pack(side='right', padx=10, pady=10)
+    def open_trash(self):
+        """Открытие корзины"""
+        pass
 
-        self.tray_status = ctk.CTkLabel(
-            right_frame,
-            text='Приложение работает в трее',
-            text_color='#27ae60',
-            font=ctk.CTkFont(size=12)
-        )
-        self.tray_status.pack(side='right')
+    def on_canvas_click(self, event):
+        """Обработчик клика на холсте"""
+        print(f'Клик на холсте: {event.x}, {event.y}')
+
+    def on_canvas_drag(self, event):
+        """Перемещение по холсту"""
+        pass
+
+    def on_canvas_release(self, event):
+        """Отпускание мыши"""
+
+        pass
 
     def create_tray_icon(self):
         """Создает иконку в системном трее"""
@@ -153,16 +130,18 @@ class StickyNotesApp(ctk.CTk):
                 height = 64
                 image = Image.new('RGB', (width, height), '#1a1a1a')
                 dc = ImageDraw.Draw(image)
-                dc.rectangle([10, 10, width-10, height-10], fill='#f1c40f', outline='#f39c12', width=2)
+                
+                dc.rectangle([12, 12, width-12, height-12], fill='#f1c40f', outline='#f39c12', width=3)
+                dc.polygon([width=25, 12, width-12, 12, width-12, 25], fill='#d35400')
 
-                for i in range(15, height-15, 8):
-                    dc.line([15, i, width-15, i], fill='#d35400', width=1)
+                for i in range(20, height-20, 10):
+                    dc.line([20, i, width-20, i], fill='#d35400', width=2)
                 
                 return image
             
             menu = pystray.Menu(
-                item('Открыть планировщик', self.show_from_tray),
-                item('Веход', self.quit_app)
+                item('📋 Открыть планировщик', self.show_from_tray),
+                item('❌ Веход', self.quit_app)
             )
 
             self.tray_icon =  pystray.Icon(
@@ -171,6 +150,11 @@ class StickyNotesApp(ctk.CTk):
                 'Мой стикер-планировщик',
                 menu
             )
+
+            def on_left_click(icon, item):
+                self.show_from_tray()
+
+            self.tray_icon._handler = on_left_click
 
             import threading
             def run_tray_icon():
@@ -209,14 +193,18 @@ class StickyNotesApp(ctk.CTk):
         self.state('normal')
         self.update_tray_status('Окно открыто')
 
-    def update_tray_status(self, status):
-        """Оюновление статуса в интерфейсе"""
-        if hasattr(self, 'tray_status'):
-            self.tray_status.configure(text=status)
-
     def quit_app(self, icon=None, item=None):
         """Полностью закрывает приложение"""
         if self.tray_icon:
             self.tray_icon.stop()
         self.destroy()
         sys.exit()
+
+def setup_autostart():
+    """Автозапуск на Windows"""
+
+if __name__ == "__main__":
+    setup_autostart()
+    
+    app = StickyNotesApp()
+    app.mainloop()

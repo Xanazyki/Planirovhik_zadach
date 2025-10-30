@@ -208,3 +208,15 @@ class StickyNotesApp(ctk.CTk):
         self.focus_force()
         self.state('normal')
         self.update_tray_status('Окно открыто')
+
+    def update_tray_status(self, status):
+        """Оюновление статуса в интерфейсе"""
+        if hasattr(self, 'tray_status'):
+            self.tray_status.configure(text=status)
+
+    def quit_app(self, icon=None, item=None):
+        """Полностью закрывает приложение"""
+        if self.tray_icon:
+            self.tray_icon.stop()
+        self.destroy()
+        sys.exit()

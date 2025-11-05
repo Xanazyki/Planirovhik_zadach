@@ -1,210 +1,219 @@
 import customtkinter as ctk
-import tkinter as tk
-from PIL import Image, ImageDraw
+from tkinter import messagebox
 import sys
 import os
-import json
-import winreg as reg
 
+ctk.set_appearance_mode('dark')
+ctk.set_default_color_theme('dark-blue')
 
-ctk.set_appearance_mode('Dark')
-ctk.set_default_color_theme('blue')
+class StickyArea(ctk.CTkFrame):
+    """Область отображения стикеров"""
+    def __init__(self, master, **kwargs):
+        super().__init__(master, **kwargs)
 
+        self.configure(fg_color='#2b2b2b')
 
-class StickyNotesApp(ctk.CTk):
+        self.hint_label = ctk.CTkLabel(
+            self,
+            text='Область для стикеров',
+            text_color='#a0a0a0',
+            font=('Arial', 16),
+        )
+        self.hint_label.place(relx=0.5, rely=0.5, anchor='center')
+
+class TabPanel(ctk.CTkFrame):
+    """Панель вкладок"""
+    def __init__(self, master, on_tab_changed, **kwargs):
+        super().__init__(master, **kwargs)
+
+        self.on_tab_changed = on_tab_changed
+        self._current_tab = 'Основаная'
+        self.tab_buttons = {}
+
+        self.configure(fg_color='#e9ecef', width=200)
+        self.pack_propagate(False)
+
+        self.title_label = ctk.CTkLabel(
+            self,
+            text='ВКЛАДКИ',
+            text_color='#495057',
+            font=('Arial', 18, 'bold')
+        )
+        self.title_label.pack(pady=(20, 15))
+
+        self.separator = ctk.CTkFrame(self, height=2, fg_color='#dee2e6')
+        self.separator.pack(fill='x', padx=10, pady=(0, 15))
+
+        self.tabs_container = ctk.CTkScrollableFrame(self, fg_color='transparent')
+        self.tabs_container.pack(fill='both', expand=True, padx=10, pady=5)
+
+        self.initialize_tabs()
+
+    def initialize_tabs(self):
+        """Создание начального набора вкладок"""
+        initial_labs = ['Основаная','Работа','Личное']
+        for tab_name in initial_labs:
+            self.add_tab(tab_name)
+
+    def add_tab(self, name):
+        """Добавление новой вкладки"""
+        tab_button = ctk.CTkButton(
+            self.tabs_container,
+            text=name,
+            font=('Arial', 14),
+            anchor='w',
+            fg_color='#007bff' if name == self._current_tab else 'transparent',
+            text_color='white' if name == self._current_tab else '#495057',
+            hover_color='#0056b3' if name == self._current_tab else '#f8f9fa',
+            corner_radius=8,
+            height=40,
+            command=lambda tab=name: self.select_tab(tab)
+        )
+        tab_button.pack(fill='x', pady=2)
+        self.tab_buttons[name] = tab_button
+
+    def select_tab(self, tab_name):
+        """Выбор вкладки"""
+        if tab_name in self.tab_buttons:
+            if self._current_tab in self.tab_buttons:
+                old_btn = self.tab_buttons[self.current_tab]
+                old_btn.configure(
+                    fg_color='transparent',
+                    text_color='#495057',
+                    hover_color='#f8f9fa'
+                )
+
+            new_btn = self.tab_buttons[tab_name]
+            new_btn.configure(
+                fg_color='#007bff',
+                text_color='white',
+                hover_color='#0056b3'
+            )
+
+            self.current_tab = tab_name
+            self.on_tab_changed(tab_name)
+
+class TrashIcon(ctk.CTkButton):
+    """Иконка корзины"""
+    def __init__(self, master, **kwargs):
+        super().__init__(
+            master,
+            text='🗑️',
+            font=('Arial', 18),
+            width=40,
+            height=40,
+            fg_color='#dc3545',
+            hover_color='#c82333',
+            corner_radius=20,
+            **kwargs
+        )
+
+class MainWindow(ctk.CTk):
+    """Главное окно"""
     def __init__(self):
         super().__init__()
 
-        self.title('Планировщик задач')
-        self.geometry('1000x800')
-        self.minsize(800, 600)
+        self.title('Доска со стикерами')
+        self.geometry('1200x800')
+        self.minsize(1000, 600)
 
-        self.tray_icon = None
-        self.tray_icon_running = False
+        self.create_interface()
 
-        self.create_ui()
+        self.bind_events()
 
-        self.create_tray_icon()
+    def create_interface(self):
+        """Основной интерфейс"""
+        self.main_container = ctk.CTkFrame(self, fg_color='transparent')
+        self.main_container.pack(fill='both', expand=True, padx=10, pady=10)
 
-        self.protocol('WM_DELETE_WINDOW', self.hide_to_tray)
-
-    def create_ui(self):
-        """Создает базовый интерфейс приложения"""
-        self.grid_rowconfigure(0, weight=1)
-        self.grid_columnconfigure(0, weight=1)
-
-        main_frame = ctk.CTkFrame(self)
-        main_frame.grid(row=0, column=0, padx=10, pady=10, sticky='nsew')
-        main_frame.grid_rowconfigure(0, weight=1)
-        main_frame.grid_columnconfigure(0, weight=1)
-
-        self.tabview = ctk.CTkTabview(main_frame, segmented_button_font=ctk.CTkFont(size=16, weight='bold'))
-        self.tabview.grid(row=0, column=0, sticky='nsew')
-
-        self.main_tab = self.tabview.add('Мои задачи')
-
-        self.main_tab.grid_rowconfigure(0, weight=1)
-        self.main_tab.grid_columnconfigure(0, weight=1)
-
-        self.setup_canvas()
-        self.setup_control_panel(main_frame)
-
-    def setup_trash_icon(self):
-        'Иконка корзины'
-        self.trash_icon = ctk.CTkButton(
-            self.main_tab,
-            text='🗑️'
-            width=60,
-            height=60,
-            font=ctk.CTkFont(size=24),
-            fg_color='#e74c3c',
-            hover_color='#c0392b',
-            corner_radius=30,
-            state='disabled',
-            command=self.open_trash
+        self.tab_panel = TabPanel(
+            self.main_container,
+            on_tab_changed=self.on_tab_changed,
+            width=200
         )
+        self.tab_panel.pack(side='left', fill='y', padx=(0, 10))
 
-        self.trash_icon.place(relx=1.0, rely=1.0, x=-20, y=-20, anchor='se')
+        self.sticky_area = StickyArea(self.main_container)
+        self.sticky_area.pack(side='left', fill='both', expand=True)
 
-    def setup_canvas(self):
-        "Свободное размещение задач"
-        self.canvas = tk.Canvas(
-            self.main_tab,
-            bg='#2b2b2b',
-            highlightthickness=0
+        self.trash_icon = TrashIcon(
+            self.sticky_area,
+            command = self.open_trash
         )
+        self.trash_icon.place(relx=0.95, rely=0.95, anchor='se')
 
-        self.canvas.grid(row=0, column=0, sticky='nsew')
+    def bind_events(self):
+        """Привязка обработчиков событий"""
+        self.sticky_area.bind("<Button-3>", self.show_context_menu)
+        self.sticky_area.bind("<Button-3>", self.show_tabs_context_menu)
 
-        self.canvas.bind('<Button-1>', self.on_canvas_click)
-        self.canvas.bind('<B1-Motion>', self.on_canvas_drag)
-        self.canvas.bind('<ButtonRelease-1>', self.on_canvas_release)
-
-    def create_temp_sticker(self, text, x, y):
-        sticker_width = 250
-        sticker_height = 180
-
-        sticker_bg = self.canvas.create_rectangle(
-            x, y, x + sticker_width, y + sticker_height,
-            fill="#ca9911",
-            outline='#f39c12'
-            width=2,
-            tags='temp_sticker'
-        )
-
-        sticker_text = self.canvas.create_text(
-            x + sticker_width // 2, y + sticker_height // 2,
-            text=text,
-            width=sticker_width - 20,
-            font=('Arial', 11),
-            fill='#2c3e50'
-            justify='center',
-            tags='temp_sticker'
-        )
+    def on_tab_changed(self, tab_name):
+        """Обработчик смены вкладок"""
+        pass
 
     def open_trash(self):
         """Открытие корзины"""
         pass
 
-    def on_canvas_click(self, event):
-        """Обработчик клика на холсте"""
-        print(f'Клик на холсте: {event.x}, {event.y}')
-
-    def on_canvas_drag(self, event):
-        """Перемещение по холсту"""
-        pass
-
-    def on_canvas_release(self, event):
-        """Отпускание мыши"""
-
-        pass
-
-    def create_tray_icon(self):
-        """Создает иконку в системном трее"""
-        try:
-            import pystray
-            from pystray import MenuItem as item
-
-            def create_image():
-                width = 64
-                height = 64
-                image = Image.new('RGB', (width, height), '#1a1a1a')
-                dc = ImageDraw.Draw(image)
-                
-                dc.rectangle([12, 12, width-12, height-12], fill='#f1c40f', outline='#f39c12', width=3)
-                dc.polygon([width=25, 12, width-12, 12, width-12, 25], fill='#d35400')
-
-                for i in range(20, height-20, 10):
-                    dc.line([20, i, width-20, i], fill='#d35400', width=2)
-                
-                return image
-            
-            menu = pystray.Menu(
-                item('📋 Открыть планировщик', self.show_from_tray),
-                item('❌ Веход', self.quit_app)
-            )
-
-            self.tray_icon =  pystray.Icon(
-                'sticky_notes_planner',
-                create_image(),
-                'Мой стикер-планировщик',
-                menu
-            )
-
-            def on_left_click(icon, item):
-                self.show_from_tray()
-
-            self.tray_icon._handler = on_left_click
-
-            import threading
-            def run_tray_icon():
-                self.tray_icon_running = True
-                self.tray_icon.run()
-
-            thread = threading.Thread(target=run_tray_icon, daemon=True)
-            thread.start()
-
-        except ImportError as e:
-            print(f'Библиотека pystray не установлена: {e}')
-            self.show_pystray_error()
-        except Exception as e:
-            print(f'Ошибка создания иконки трея: {e}')
-
-    def show_pystray_error(self):
-        """Сообщение об ошибке"""
-        error_label = ctk.CTkLabel(
+    def show_context_menu(self, event):
+        """Контекстное меню для области стикеров"""
+        context_menu = ctk.CTkMenu(
             self,
-            text='Для работы работы с треем установите: pip install pystray',
-            text_color="#e74c3c",
-            font=ctk.CTkFont(size=12)
+            values=['Создать заметку', "Уполядочить стикеры"],
+            command=self.handle_context_menu
         )
-        error_label.grid(row=2, column=0, pady=10)
+        context_menu.show(event.x_root, event.y_root)
 
-    def hide_to_tray(self):
-        "Скрывает окно в трее"
-        self.withdraw()
-        self.update_tray_status('Свернуто в трей')
+    def show_tabs_context_menu(self, event):
+        """Показ контекстного меню для панели вкладом"""
+        context_menu = ctk.CTkMenu(
+            self,
+            values=['Создать вкладку', 'Переименовать', "Удалить"],
+            camman=self.handle_tabs_context_menu
+        )
+        context_menu.show(event.x_root, event.y_root)
 
-    def show_from_tray(self, icon=None, item=None):
-        """Показывает окно из трея"""
-        self.deiconify()
-        self.lift()
-        self.focus_force()
-        self.state('normal')
-        self.update_tray_status('Окно открыто')
+    def handle_context_menu(self, option):
+        """Обработчик контекстного меню области стикеров"""
+        if option == 'Создать заметку':
+            self.create_new_note()
+        elif option == 'Упорядочить стикеры':
+            self.arrange_notes()
 
-    def quit_app(self, icon=None, item=None):
-        """Полностью закрывает приложение"""
-        if self.tray_icon:
-            self.tray_icon.stop()
-        self.destroy()
-        sys.exit()
+    def handle_tabs_context_menu(self, option):
+        """Обработчик контекстного меню панели вкладок"""
+        if option == 'Создать вкладку':
+            self.create_new_tab()
+        elif option == 'Переименовать':
+            self.rename_tab()
+        elif option == 'Удалить':
+            self.delete_tab()
 
-def setup_autostart():
-    """Автозапуск на Windows"""
+    def create_new_note(self):
+        """Создание новой заметки"""
+        pass
 
-if __name__ == "__main__":
-    setup_autostart()
-    
-    app = StickyNotesApp()
+    def arrange_notes(self):
+        """Упорядочевание стикеров"""
+        pass
+
+    def create_new_tab(self):
+        """Создание новой вкладки"""
+        pass
+
+    def rename_tab(self):
+        """Переименование вкладки"""
+        pass
+
+    def delete_tab(self):
+        """Удаление вкладки"""
+        pass
+
+def main():
+    """Основная функция приложения"""
+    app = MainWindow()
     app.mainloop()
+
+
+if __name__ == '__main__':
+    main()
